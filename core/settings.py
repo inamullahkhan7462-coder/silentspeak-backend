@@ -25,8 +25,8 @@ SECRET_KEY = 'django-insecure-ihju3!j*sy7eb=dpr%-827h$dt_^zbjxa(yhvpte6ljed)21rf
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['silentspeak-backend.onrender.com', 'localhost', '127.0.0.1']
-
+# Change this line
+ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
