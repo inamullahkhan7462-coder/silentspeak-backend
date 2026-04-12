@@ -39,22 +39,31 @@ import io
 #         return Response({"error": str(e)}, status=400)
 
 import tensorflow as tf
-from keras.layers import InputLayer
-import pickle
+from keras.layers import InputLayer, Conv2D, Dense, Flatten, MaxPooling2D
 
-# 1. This fixes the 'batch_shape' error in your specific .h5 file
-class FixedInputLayer(InputLayer):
-    def __init__(self, *args, **kwargs):
-        kwargs.pop('batch_shape', None)
-        kwargs.pop('optional', None)
-        super().__init__(*args, **kwargs)
+# 1. This "Universal Fixer" handles the new DTypePolicy and batch_shape errors
+class FixedLayer:
+    @classmethod
+    def from_config(cls, config):
+        # Remove the modern keys that break older TensorFlow versions
+        config.pop('dtype', None)
+        config.pop('batch_shape', None)
+        config.pop('optional', None)
+        return super(cls, cls).from_config(config)
 
-# 2. Load the model with the fix
+# Apply the fix to all layer types used in your model
+class FixedInput(FixedLayer, InputLayer): pass
+class FixedConv2D(FixedLayer, Conv2D): pass
+class FixedDense(FixedLayer, Dense): pass
+
+# 2. Load the model using these fixed versions
 model = tf.keras.models.load_model(
     'final_psl_model.h5', 
-    custom_objects={'InputLayer': FixedInputLayer}
+    custom_objects={
+        'InputLayer': FixedInput,
+        'Conv2D': FixedConv2D,
+        'Dense': FixedDense,
+        'DTypePolicy': lambda **x: None # This ignores the DTypePolicy error directly
+    },
+    compile=False # Adding this avoids errors with the optimizer settings
 )
-
-# 3. Load your classes
-with open('classes.pkl', 'rb') as f:
-    classes = pickle.load(f)
