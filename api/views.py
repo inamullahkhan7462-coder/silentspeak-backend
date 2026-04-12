@@ -39,31 +39,25 @@ import io
 #         return Response({"error": str(e)}, status=400)
 
 import tensorflow as tf
-from keras.layers import InputLayer, Conv2D, Dense, Flatten, MaxPooling2D
+import pickle
+import os
 
-# 1. This "Universal Fixer" handles the new DTypePolicy and batch_shape errors
-class FixedLayer:
-    @classmethod
-    def from_config(cls, config):
-        # Remove the modern keys that break older TensorFlow versions
-        config.pop('dtype', None)
-        config.pop('batch_shape', None)
-        config.pop('optional', None)
-        return super(cls, cls).from_config(config)
+# This tells TensorFlow to ignore the "DTypePolicy" and other new features
+from keras.utils import custom_object_scope
 
-# Apply the fix to all layer types used in your model
-class FixedInput(FixedLayer, InputLayer): pass
-class FixedConv2D(FixedLayer, Conv2D): pass
-class FixedDense(FixedLayer, Dense): pass
+# 1. Define a simple dummy function for the stuff Render doesn't understand
+def ignore_extra_args(**kwargs):
+    return None
 
-# 2. Load the model using these fixed versions
-model = tf.keras.models.load_model(
-    'final_psl_model.h5', 
-    custom_objects={
-        'InputLayer': FixedInput,
-        'Conv2D': FixedConv2D,
-        'Dense': FixedDense,
-        'DTypePolicy': lambda **x: None # This ignores the DTypePolicy error directly
-    },
-    compile=False # Adding this avoids errors with the optimizer settings
-)
+# 2. Load the model inside a "Custom Object Scope"
+# This is like giving the loader a dictionary to translate the 'new' words
+try:
+    with custom_object_scope({
+        'DTypePolicy': ignore_extra_args,
+        'batch_shape': ignore_extra_args,
+    }):
+        model = tf.keras.models.load_model('final_psl_model.h5', compile=False)
+    print("Model loaded successfully!")
+except Exception as e:
+    print(f"Model load failed: {e}")
+    model = None
