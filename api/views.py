@@ -39,25 +39,35 @@ import io
 #         return Response({"error": str(e)}, status=400)
 
 import tensorflow as tf
+import keras
 import pickle
 import os
+from django.conf import settings
 
-# This tells TensorFlow to ignore the "DTypePolicy" and other new features
-from keras.utils import custom_object_scope
+# Define paths
+MODEL_PATH = os.path.join(settings.BASE_DIR, 'final_psl_model.h5')
+CLASSES_PATH = os.path.join(settings.BASE_DIR, 'classes.pkl')
 
-# 1. Define a simple dummy function for the stuff Render doesn't understand
-def ignore_extra_args(**kwargs):
-    return None
+model = None
+classes = None
 
-# 2. Load the model inside a "Custom Object Scope"
-# This is like giving the loader a dictionary to translate the 'new' words
 try:
-    with custom_object_scope({
-        'DTypePolicy': ignore_extra_args,
-        'batch_shape': ignore_extra_args,
-    }):
-        model = tf.keras.models.load_model('final_psl_model.h5', compile=False)
-    print("Model loaded successfully!")
+    # Load the model normally - Keras 3 handles the DTypePolicy automatically!
+    if os.path.exists(MODEL_PATH):
+        model = keras.models.load_model(MODEL_PATH)
+        print("Model loaded successfully!")
+    else:
+        print(f"Model file not found at {MODEL_PATH}")
+
+    # Load your classes
+    if os.path.exists(CLASSES_PATH):
+        with open(CLASSES_PATH, 'rb') as f:
+            classes = pickle.load(f)
+        print("Classes loaded successfully!")
+    else:
+        print(f"Classes file not found at {CLASSES_PATH}")
+
 except Exception as e:
-    print(f"Model load failed: {e}")
+    print(f"Error during initialization: {e}")
     model = None
+    classes = None
