@@ -42,9 +42,13 @@ import tensorflow as tf
 import keras
 import pickle
 import os
+import numpy as np
+from PIL import Image
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 from django.conf import settings
 
-# Define paths
+# --- MODEL LOADING PART ---
 MODEL_PATH = os.path.join(settings.BASE_DIR, 'final_psl_model.h5')
 CLASSES_PATH = os.path.join(settings.BASE_DIR, 'classes.pkl')
 
@@ -52,22 +56,45 @@ model = None
 classes = None
 
 try:
-    # Load the model normally - Keras 3 handles the DTypePolicy automatically!
     if os.path.exists(MODEL_PATH):
         model = keras.models.load_model(MODEL_PATH)
         print("Model loaded successfully!")
-    else:
-        print(f"Model file not found at {MODEL_PATH}")
-
-    # Load your classes
+    
     if os.path.exists(CLASSES_PATH):
         with open(CLASSES_PATH, 'rb') as f:
             classes = pickle.load(f)
         print("Classes loaded successfully!")
-    else:
-        print(f"Classes file not found at {CLASSES_PATH}")
-
 except Exception as e:
     print(f"Error during initialization: {e}")
-    model = None
-    classes = None
+
+# --- THE MISSING FUNCTION (The fix for your error) ---
+@api_view(['POST'])
+def predict_sign(request):
+    if model is None or classes is None:
+        return Response({'error': 'Model or classes not loaded on server'}, status=500)
+    
+    try:
+        # 1. Get image from request
+        file = request.FILES['image']
+        img = Image.open(file).convert('RGB')
+        
+        # 2. Resize to 180x180 (matching your training)
+        img = img.resize((180, 180))
+        img_array = np.array(img) / 255.0  # Normalize
+        img_array = np.expand_dims(img_array, axis=0)
+        
+        # 3. Predict
+        predictions = model.predict(img_array)
+        score = tf.nn.softmax(predictions)
+        
+        result_index = np.argmax(score)
+        predicted_class = classes[result_index]
+        confidence = float(np.max(score)) * 100
+
+        return Response({
+            'prediction': predicted_class,
+            'confidence': f"{confidence:.2f}%"
+        })
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
